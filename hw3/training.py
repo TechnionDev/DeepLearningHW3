@@ -62,7 +62,7 @@ class Trainer(abc.ABC):
         """
         actual_num_epochs = 0
         train_loss, train_acc, test_loss, test_acc = [], [], [], []
-
+        print(f"device is {self.device}")
         best_acc = None
         epochs_without_improvement = 0
 
@@ -270,12 +270,12 @@ class RNNTrainer(Trainer):
             output, state = self.model(x)
         else:
             output, state = self.model(x, self.prev_state)
-        loss = self.loss_fn(output.permute(0,2,1), y)
+        loss = self.loss_fn(output.permute(0,2,1).to(self.device), y)
         pred = torch.argmax(output, dim=2)
         loss.backward()
         self.prev_state = state.detach().clone()
         self.optimizer.step()
-        num_correct = (pred == y).sum()
+        num_correct = (pred.to(device=self.device) == y).sum()
 
         # ========================
 
@@ -300,12 +300,10 @@ class RNNTrainer(Trainer):
                 output, state = self.model(x)
             else:
                 output, state = self.model(x, self.prev_state)
-            loss = self.loss_fn(output, y)
-            pred = torch.argmax(output, dim=3)
+            loss = self.loss_fn(output.permute(0,2,1).to(device=self.device), y)
+            pred = torch.argmax(output, dim=2).to(device=self.device)
             num_correct = (pred == y).sum()
             self.prev_state = state.detach().clone()
-
-            print(f"shape of pred is {pred.shape} shape of y is {y.shape}")
         # ========================
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)

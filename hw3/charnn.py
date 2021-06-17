@@ -127,7 +127,7 @@ def chars_to_labelled_samples(text: str, char_to_idx: dict, seq_len: int, device
     samples = sample_embedding.reshape(num_samples, seq_len, len(char_to_idx))
 
     label_embedding = chars_to_onehot(text, char_to_idx).float().to(device=device)
-    indexes = torch.Tensor(range(len(char_to_idx)))
+    indexes = torch.FloatTensor(range(len(char_to_idx))).to(device=device)
     chars_in_indexes = (indexes @ label_embedding.T)[1:num_samples * seq_len + 1]
     labels = chars_in_indexes.reshape(num_samples, seq_len)
     # ========================
@@ -183,7 +183,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     #  See torch.no_grad().
     # ====== YOUR CODE: ======
     n_chars = n_chars - len(start_sequence)
-    model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float()
+    model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float().to(device=device)
     state = None
     with torch.no_grad():
         for _ in range(n_chars):
@@ -192,7 +192,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
             sample = torch.multinomial(vec, 1)
             model_in = idx_to_char[sample.item()]
             out_text += model_in
-            model_in = chars_to_onehot(model_in, char_to_idx).unsqueeze(0).float()
+            model_in = chars_to_onehot(model_in, char_to_idx).unsqueeze(0).float().to(device=device)
 
     # ========================
     return out_text
