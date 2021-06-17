@@ -150,7 +150,6 @@ def hot_softmax(y, dim=0, temperature=1.0):
     # ========================
     return result
 
-
 def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     """
     Generates a sequence of chars based on a given model and a start sequence.
@@ -184,18 +183,18 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     # ====== YOUR CODE: ======
     n_chars = n_chars - len(start_sequence)
     model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float()
+    state = None
     with torch.no_grad():
-        for i in range(n_chars):
-            out, state = model(model_in)
-            vec = hot_softmax(out[0, -1, :], 0, temperature=T)
+        for _ in range(n_chars):
+            out, state = model(model_in,state)
+            vec = hot_softmax(out[0, -1], dim=-1, temperature=T)
             sample = torch.multinomial(vec, 1)
             model_in = idx_to_char[sample.item()]
             out_text += model_in
-            model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float()
+            model_in = chars_to_onehot(model_in, char_to_idx).unsqueeze(0).float()
+
     # ========================
-
     return out_text
-
 
 class SequenceBatchSampler(torch.utils.data.Sampler):
     """
