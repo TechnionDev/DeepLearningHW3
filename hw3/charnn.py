@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.utils.data
 from torch import Tensor
 from typing import Iterator
-
+import unittest
 
 def char_maps(text: str):
     """
@@ -89,9 +89,10 @@ def onehot_to_chars(embedded_text: Tensor, idx_to_char: dict) -> str:
     """
     # TODO: Implement the reverse-embedding.
     # ====== YOUR CODE: ======
-    indexes = torch.Tensor(range(len(idx_to_char))).to(torch.int8)
+    indexes = torch.FloatTensor(range(len(idx_to_char))).to(device=embedded_text.device)
+    embedded_text=embedded_text.clone().float()
     chars_in_indexes = (indexes @ embedded_text.T).tolist()
-    result = "".join([idx_to_char[i] for i in chars_in_indexes])
+    result = "".join([idx_to_char[int(i)] for i in chars_in_indexes])
     # ========================
     return result
 
@@ -125,8 +126,8 @@ def chars_to_labelled_samples(text: str, char_to_idx: dict, seq_len: int, device
     sample_embedding = sample_embedding[:num_samples * seq_len]
     samples = sample_embedding.reshape(num_samples, seq_len, len(char_to_idx))
 
-    label_embedding = chars_to_onehot(text, char_to_idx).to(device=device)
-    indexes = torch.Tensor(range(len(char_to_idx))).to(torch.int8)
+    label_embedding = chars_to_onehot(text, char_to_idx).float().to(device=device)
+    indexes = torch.Tensor(range(len(char_to_idx)))
     chars_in_indexes = (indexes @ label_embedding.T)[1:num_samples * seq_len + 1]
     labels = chars_in_indexes.reshape(num_samples, seq_len)
     # ========================

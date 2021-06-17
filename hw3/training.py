@@ -93,7 +93,25 @@ class Trainer(abc.ABC):
             #  - Implement early stopping. This is a very useful and
             #    simple regularization technique that is highly recommended.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            actual_num_epochs = epoch
+            train_result = self.train_epoch(dl_train, verbose=verbose, **kw)
+            train_loss += train_result.losses
+            train_acc += [train_result.accuracy]
+            test_result = self.test_epoch(dl_test, verbose=verbose, **kw)
+            test_loss += test_result.losses
+            test_acc += [test_result.accuracy]
+
+            if best_acc is None or best_acc < test_result.accuracy:
+                best_acc = test_result.accuracy
+                epochs_without_improvement = 0
+                # if checkpoints is not None:
+                #     torch.save(self.model, checkpoints)
+            else:
+                epochs_without_improvement += 1
+
+            if early_stopping:
+                if epochs_without_improvement >= early_stopping:
+                    break
             # ========================
 
             # Save model checkpoint if requested
