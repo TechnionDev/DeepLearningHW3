@@ -35,15 +35,15 @@ class Trainer(abc.ABC):
         model.to(self.device)
 
     def fit(
-        self,
-        dl_train: DataLoader,
-        dl_test: DataLoader,
-        num_epochs,
-        checkpoints: str = None,
-        early_stopping: int = None,
-        print_every=1,
-        post_epoch_fn=None,
-        **kw,
+            self,
+            dl_train: DataLoader,
+            dl_test: DataLoader,
+            num_epochs,
+            checkpoints: str = None,
+            early_stopping: int = None,
+            print_every=1,
+            post_epoch_fn=None,
+            **kw,
     ) -> FitResult:
         """
         Trains the model for multiple epochs with a given training set,
@@ -84,7 +84,7 @@ class Trainer(abc.ABC):
             verbose = False  # pass this to train/test_epoch.
             if epoch % print_every == 0 or epoch == num_epochs - 1:
                 verbose = True
-            self._print(f"--- EPOCH {epoch+1}/{num_epochs} ---", verbose)
+            self._print(f"--- EPOCH {epoch + 1}/{num_epochs} ---", verbose)
 
             # TODO:
             #  Train & evaluate for one epoch
@@ -105,7 +105,7 @@ class Trainer(abc.ABC):
                 )
                 torch.save(saved_state, checkpoint_filename)
                 print(
-                    f"*** Saved checkpoint {checkpoint_filename} " f"at epoch {epoch+1}"
+                    f"*** Saved checkpoint {checkpoint_filename} " f"at epoch {epoch + 1}"
                 )
 
             if post_epoch_fn:
@@ -166,10 +166,10 @@ class Trainer(abc.ABC):
 
     @staticmethod
     def _foreach_batch(
-        dl: DataLoader,
-        forward_fn: Callable[[Any], BatchResult],
-        verbose=True,
-        max_batches=None,
+            dl: DataLoader,
+            forward_fn: Callable[[Any], BatchResult],
+            verbose=True,
+            max_batches=None,
     ) -> EpochResult:
         """
         Evaluates the given forward-function on batches from the given
@@ -216,19 +216,20 @@ class Trainer(abc.ABC):
 
 class RNNTrainer(Trainer):
     def __init__(self, model, loss_fn, optimizer, device=None):
+        self.prev_state = None
         super().__init__(model, loss_fn, optimizer, device)
 
     def train_epoch(self, dl_train: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # set train mode
+
         # ========================
         return super().train_epoch(dl_train, **kw)
 
     def test_epoch(self, dl_test: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
         # ========================
         return super().test_epoch(dl_test, **kw)
 
@@ -246,7 +247,21 @@ class RNNTrainer(Trainer):
         #  - Update params
         #  - Calculate number of correct char predictions
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.optimizer.zero_grad()
+        # print("duh")
+        if self.prev_state is None:
+            output, state = self.model(x)
+        else:
+            output, state = self.model(x, self.prev_state)
+        # print(f"shape of y is {y.shape}")
+        # print(f"shape of output is {output.shape}, shape of state is {state.shape}")
+
+        loss = self.loss_fn(output.squeeze(), y.squeeze())
+        pred = torch.argmax(output, dim=2)
+        loss.backward()
+        self.optimizer.step()
+        num_correct = (pred == y).sum()
+        self.prev_state = state.detach().clone()
         # ========================
 
         # Note: scaling num_correct by seq_len because each sample has seq_len
@@ -266,8 +281,12 @@ class RNNTrainer(Trainer):
             #  - Loss calculation
             #  - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
-            # ========================
+            output, _ = self.model(x)
+            loss = self.loss_fn(output, y)
+            pred = torch.argmax(output, dim=3)
+            num_correct = (pred == y).sum()
+            print(f"shape of pred is {pred.shape} shape of y is {y.shape}")
+        # ========================
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)
 
