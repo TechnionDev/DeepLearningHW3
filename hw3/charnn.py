@@ -183,7 +183,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     #  See torch.no_grad().
     # ====== YOUR CODE: ======
     n_chars = n_chars - len(start_sequence)
-    model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0)
+    model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float()
     with torch.no_grad():
         for i in range(n_chars):
             out, state = model(model_in)
@@ -191,7 +191,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
             sample = torch.multinomial(vec, 1)
             model_in = idx_to_char[sample.item()]
             out_text += model_in
-            model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0)
+            model_in = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(0).float()
     # ========================
 
     return out_text
@@ -216,13 +216,10 @@ class SequenceBatchSampler(torch.utils.data.Sampler):
     def __iter__(self) -> Iterator[int]:
         idx = None  # idx should be a 1-d list of indices.
         # ====== YOUR CODE: ======
-        # TODO: Reconsider impl, this is too simple, sari's is much different
         num_batches = len(self.dataset) // self.batch_size
-        starting_idx = (torch.arange(self.batch_size) * num_batches).reshape(-1, 1)
-        jumps = torch.arange(num_batches).reshape(1, -1)
-        idx = (starting_idx + jumps).T.reshape(-1)
-        # ========================
-        return iter(idx)
+        for j in range(num_batches):
+            for i in range(self.batch_size):
+                yield j+i*num_batches
 
     def __len__(self):
         return len(self.dataset)
@@ -272,18 +269,27 @@ class MultilayerGRU(nn.Module):
         print(f"out_dim is {out_dim}")
         self.sigmoid = torch.nn.Sigmoid()
         self.tanh = torch.nn.Tanh()
+        self.dropout = torch.nn.Dropout(p=dropout)
+
         for i in range(n_layers):
             self.layer_params += [{}]
             if i == 0:
-                input_dim = in_dim + h_dim
+                input_dim = in_dim
             else:
-                input_dim = h_dim * 2
-            self.layer_params[i]['z'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.layer_params[i]['r'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.layer_params[i]['g'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.add_module(f'z{i}', self.layer_params[i]['z'])
-            self.add_module(f'r{i}', self.layer_params[i]['r'])
-            self.add_module(f'g{i}', self.layer_params[i]['g'])
+                input_dim = h_dim
+
+            self.layer_params[i]['z_in'] = nn.Linear(input_dim, h_dim, bias=True)
+            self.layer_params[i]['z_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
+            self.layer_params[i]['r_in'] = nn.Linear(input_dim, h_dim, bias=True)
+            self.layer_params[i]['r_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
+            self.layer_params[i]['g_in'] = nn.Linear(input_dim, h_dim, bias=True)
+            self.layer_params[i]['g_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
+            self.add_module(f'z_input{i}', self.layer_params[i]['z_in'])
+            self.add_module(f'z_hidden{i}', self.layer_params[i]['z_hidden'])
+            self.add_module(f'r_input{i}', self.layer_params[i]['r_in'])
+            self.add_module(f'r_hidden{i}', self.layer_params[i]['r_hidden'])
+            self.add_module(f'g_input{i}', self.layer_params[i]['g_in'])
+            self.add_module(f'g_hidden{i}', self.layer_params[i]['g_hidden'])
             in_dim = out_dim
         self.output_layer = nn.Linear(h_dim, out_dim, bias=True)
         # ========================
@@ -324,15 +330,17 @@ class MultilayerGRU(nn.Module):
         #  single tensor in a differentiable manner.
         # ====== YOUR CODE: ======
         layer_output = torch.zeros((input.shape[0], input.shape[1], self.out_dim))
+
         for j in range(input.shape[1]):
             x = input[:, j]
             for i, layer in enumerate(self.layer_params):
-                in_d = torch.cat((x, layer_states[i]), dim=1)
-                update_gate_out = self.sigmoid(layer['z'](in_d))
-                reset_gate_out = self.sigmoid(layer['r'](in_d))
+                if i != 0:
+                    x = self.dropout(x)
+                update_gate_out = self.sigmoid(layer['z_in'](x)+layer['z_hidden'](layer_states[i]))
+                reset_gate_out = self.sigmoid(layer['r_in'](x)+layer['r_hidden'](layer_states[i]))
                 h_dot_r = layer_states[i] * reset_gate_out
-                candidate_in_d = torch.cat((x, h_dot_r), dim=1)
-                candidate_hidden_out = self.tanh(layer['g'](candidate_in_d))
+                # candidate_in_d = torch.cat((x, h_dot_r), dim=1)
+                candidate_hidden_out = self.tanh(layer['g_in'](x)+layer['g_hidden'](h_dot_r))
                 layer_states[i] = update_gate_out * layer_states[i] + (1 - update_gate_out) * candidate_hidden_out
                 x = layer_states[i]
             layer_output[:, j, :] = self.output_layer(x)

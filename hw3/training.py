@@ -223,7 +223,7 @@ class RNNTrainer(Trainer):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
         # set train mode
-
+        self.prev_state = None
         # ========================
         return super().train_epoch(dl_train, **kw)
 
@@ -248,20 +248,17 @@ class RNNTrainer(Trainer):
         #  - Calculate number of correct char predictions
         # ====== YOUR CODE: ======
         self.optimizer.zero_grad()
-        # print("duh")
         if self.prev_state is None:
             output, state = self.model(x)
         else:
             output, state = self.model(x, self.prev_state)
-        # print(f"shape of y is {y.shape}")
-        # print(f"shape of output is {output.shape}, shape of state is {state.shape}")
-
-        loss = self.loss_fn(output.squeeze(), y.squeeze())
+        loss = self.loss_fn(output.permute(0,2,1), y)
         pred = torch.argmax(output, dim=2)
         loss.backward()
+        self.prev_state = state.detach().clone()
         self.optimizer.step()
         num_correct = (pred == y).sum()
-        self.prev_state = state.detach().clone()
+
         # ========================
 
         # Note: scaling num_correct by seq_len because each sample has seq_len
@@ -281,10 +278,15 @@ class RNNTrainer(Trainer):
             #  - Loss calculation
             #  - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            output, _ = self.model(x)
+            if self.prev_state is None:
+                output, state = self.model(x)
+            else:
+                output, state = self.model(x, self.prev_state)
             loss = self.loss_fn(output, y)
             pred = torch.argmax(output, dim=3)
             num_correct = (pred == y).sum()
+            self.prev_state = state.detach().clone()
+
             print(f"shape of pred is {pred.shape} shape of y is {y.shape}")
         # ========================
 
