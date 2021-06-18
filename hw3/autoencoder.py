@@ -19,7 +19,22 @@ class EncoderCNN(nn.Module):
         #  use pooling or only strides, use any activation functions,
         #  use BN or Dropout, etc.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        layers = [64, 128, 256, 512]
+        in_c = in_channels
+        for i, layer in enumerate(layers):
+            if i > 0 and i % 2 == 1:
+                dilation = 2
+                stride = 2
+            else:
+                dilation = 1
+                stride = 1
+            modules += [
+                nn.Conv2d(in_channels=in_c, out_channels=layer, kernel_size=3, dilation=dilation, stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
+            in_c = layer
+        modules += [nn.Conv2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=1)]
+
         # ========================
         self.cnn = nn.Sequential(*modules)
 
@@ -33,6 +48,7 @@ class DecoderCNN(nn.Module):
 
         modules = []
 
+        # torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1)[
         # TODO:
         #  Implement the "mirror" CNN of the encoder.
         #  For example, instead of Conv layers use transposed convolutions,
@@ -42,7 +58,26 @@ class DecoderCNN(nn.Module):
         #  output should be a batch of images, with same dimensions as the
         #  inputs to the Encoder were.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        layers = list(reversed([64, 128, 256, 512]))
+        in_c = in_channels
+        for i, layer in enumerate(layers):
+            if i % 2 == 0:
+                dilation = 2
+                stride = 2
+            else:
+                dilation = 1
+                stride = 1
+            modules += [
+                nn.ConvTranspose2d(in_channels=in_c,
+                                   out_channels=layer,
+                                   kernel_size=3,
+                                   dilation=dilation,
+                                   stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
+            in_c = layer
+        modules += [nn.ConvTranspose2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=2)]
+
         # ========================
         self.cnn = nn.Sequential(*modules)
 
@@ -70,7 +105,10 @@ class VAE(nn.Module):
 
         # TODO: Add more layers as needed for encode() and decode().
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.mu_layer = nn.Linear(n_features, z_dim, bias=True)
+        self.sigma_layer = nn.Linear(n_features, z_dim, bias=True)
+        self.z_decoding_layer = nn.Linear(z_dim, n_features, bias=True)
+
         # ========================
 
     def _check_features(self, in_size):
@@ -91,7 +129,11 @@ class VAE(nn.Module):
         #     log_sigma2 (mean and log variance) of q(Z|x).
         #  2. Apply the reparametrization trick to obtain z.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        h = self.features_encoder(x).reshape(x.shape[0], -1)
+        sample = torch.randn((h.shape[0], self.z_dim))
+        mu = self.mu_layer(h)
+        log_sigma2 = self.sigma_layer(h)
+        z = mu + sample * log_sigma2
         # ========================
 
         return z, mu, log_sigma2
@@ -102,7 +144,9 @@ class VAE(nn.Module):
         #  1. Convert latent z to features h with a linear layer.
         #  2. Apply features decoder.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        h = self.z_decoding_layer(z)
+        h = h.reshape((h.shape[0], *self.features_shape))
+        x_rec = self.features_decoder(h)
         # ========================
 
         # Scale to [-1, 1] (same dynamic range as original images).
@@ -121,7 +165,9 @@ class VAE(nn.Module):
             #    Instead of sampling from N(psi(z), sigma2 I), we'll just take
             #    the mean, i.e. psi(z).
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            # todo: from where should i get the mean!?
+            z = torch.randn((n, self.z_dim), device=device)
+            samples = self.decode(z)
             # ========================
 
         # Detach and move to CPU for display purposes
@@ -154,7 +200,15 @@ def vae_loss(x, xr, z_mu, z_log_sigma2, x_sigma2):
     #  1. The covariance matrix of the posterior is diagonal.
     #  2. You need to average over the batch dimension.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    # TODO: RECONSIDER IMPL, MINE DOESNT WORK SARI DOES
+    dx = torch.prod(torch.tensor(x.shape[1:]))
+    dz = z_mu.shape[1]
+
+    data_loss = (((x-xr).reshape(x.shape[0],-1).norm(dim=-1)**2) / (x_sigma2*dx)).mean()
+    var_mat = torch.exp(z_log_sigma2)
+    print(var_mat.shape)
+    kldiv_loss = torch.exp(z_log_sigma2).sum(dim=-1) - z_log_sigma2.sum(dim=-1) + z_mu.norm(dim=-1) ** 2 - dz
+    loss = data_loss + kldiv_loss.mean()
     # ========================
 
     return loss, data_loss, kldiv_loss

@@ -339,7 +339,6 @@ class MultilayerGRU(nn.Module):
                 update_gate_out = self.sigmoid(layer['z_in'](x)+layer['z_hidden'](layer_states[i]))
                 reset_gate_out = self.sigmoid(layer['r_in'](x)+layer['r_hidden'](layer_states[i]))
                 h_dot_r = layer_states[i] * reset_gate_out
-                # candidate_in_d = torch.cat((x, h_dot_r), dim=1)
                 candidate_hidden_out = self.tanh(layer['g_in'](x)+layer['g_hidden'](h_dot_r))
                 layer_states[i] = update_gate_out * layer_states[i] + (1 - update_gate_out) * candidate_hidden_out
                 x = layer_states[i]
