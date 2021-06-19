@@ -5,6 +5,7 @@ Note: Inside the answer strings you can use Markdown format and also LaTeX
 math (delimited with $$).
 """
 
+
 # ==============
 # Part 1 answers
 
@@ -22,14 +23,14 @@ def part1_rnn_hyperparams():
     )
     # TODO: Set the hyperparameters to train the model.
     # ====== YOUR CODE: ======
-    hypers['batch_size']=1000
-    hypers['seq_len']=10
-    hypers['h_dim']=256
-    hypers['n_layers']=3
+    hypers['batch_size'] = 1000
+    hypers['seq_len'] = 10
+    hypers['h_dim'] = 256
+    hypers['n_layers'] = 3
     hypers['dropout'] = 0.4
     hypers['learn_rate'] = 1e-3
     # hypers.lr_sched_factor =
-    
+
     # ========================
     return hypers
 
@@ -111,12 +112,12 @@ def part2_vae_hyperparams():
     )
     # TODO: Tweak the hyperparameters to generate a former president.
     # ====== YOUR CODE: ======
-    hypers['batch_size']=100
+    hypers['batch_size'] = 100
     hypers['h_dim'] = 128
     hypers['z_dim'] = 32
     hypers['x_sigma2'] = 0.0008
     hypers['learn_rate'] = 1e-3
-    hypers['betas'] = (0.9,0.999)
+    hypers['betas'] = (0.9, 0.999)
     # ========================
     return hypers
 
