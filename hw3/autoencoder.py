@@ -1,71 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Sequence
-
-
-class SkipConnection(nn.Module):
-    """
-    A skip connection module
-    """
-
-    def __init__(self,
-                 main_path,
-                 in_channels,
-                 out_channels):
-        super().__init__()
-        self.main_path = main_path
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.shortcut = nn.Identity() if in_channels == out_channels else nn.Conv2d(in_channels=in_channels,
-                                                                                    out_channels=out_channels,
-                                                                                    kernel_size=1)
-
-    def forward(self, X):
-        return self.main_path(X) + self.shortcut(X)
-
-
-class InceptionBlock(nn.Module):
-    """
-    Generate a general purpose Inception block
-    """
-
-    def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            kernel_sizes: Sequence[int] = [1, 3, 5],
-            batchnorm: bool = False,
-            dropout: float = 0.0,
-            **kwargs,
-    ):
-        super().__init__()
-        assert (out_channels % 4 == 0)
-        out_channels = int(out_channels / 4)
-        self.wide_layer = []
-        pooling = [
-            nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=1)]
-        self.wide_layer += [pooling]
-        self.wide_layer += [[nn.Conv2d(in_channels=in_channels,
-                                       out_channels=out_channels,
-                                       kernel_size=kernel_size,
-                                       padding=int((kernel_size - 1) / 2),
-                                       bias=True)] for kernel_size in kernel_sizes]
-        if dropout > 0:
-            self.wide_layer = [conv + [nn.Dropout2d(p=dropout)] for conv in self.wide_layer]
-        if batchnorm:
-            self.wide_layer = [conv + [nn.BatchNorm2d(num_features=out_channels)] for conv in self.wide_layer]
-        self.wide_layer = [nn.Sequential(*filt) for filt in self.wide_layer]
-        self.wide_layer = nn.ModuleList(self.wide_layer)
-        self.activation_layer = nn.ELU()
-
-    def forward(self, x):
-        output = [conv_filter(x) for conv_filter in self.wide_layer]
-        activated = [self.activation_layer(element) for element in output]
-        return torch.cat(activated, 1)
+from math import prod
 
 
 class EncoderCNN(nn.Module):
@@ -84,12 +20,19 @@ class EncoderCNN(nn.Module):
         #  use pooling or only strides, use any activation functions,
         #  use BN or Dropout, etc.
         # ====== YOUR CODE: ======
-        layers = [64, 128] * 3
+        layers = [64, 128, 256, 512]
         in_c = in_channels
         for i, layer in enumerate(layers):
+            if i > 0 and i % 2 == 1:
+                dilation = 2
+                stride = 2
+            else:
+                dilation = 1
+                stride = 1
             modules += [
-                SkipConnection(InceptionBlock(in_channels=in_c, out_channels=layer, batchnorm=True), in_channels=in_c,
-                               out_channels=layer)]
+                nn.Conv2d(in_channels=in_c, out_channels=layer, kernel_size=3, dilation=dilation, stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
             in_c = layer
         modules += [nn.Conv2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=1)]
 
@@ -106,7 +49,6 @@ class DecoderCNN(nn.Module):
 
         modules = []
 
-        # torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1)[
         # TODO:
         #  Implement the "mirror" CNN of the encoder.
         #  For example, instead of Conv layers use transposed convolutions,
@@ -116,14 +58,25 @@ class DecoderCNN(nn.Module):
         #  output should be a batch of images, with same dimensions as the
         #  inputs to the Encoder were.
         # ====== YOUR CODE: ======
-        layers = [64, 128] * 3
+        layers = list(reversed([64, 128, 256, 512]))
         in_c = in_channels
         for i, layer in enumerate(layers):
+            if i % 2 == 0:
+                dilation = 2
+                stride = 2
+            else:
+                dilation = 1
+                stride = 1
             modules += [
-                SkipConnection(InceptionBlock(in_channels=in_c, out_channels=layer, batchnorm=True), in_channels=in_c,
-                               out_channels=layer)]
+                nn.ConvTranspose2d(in_channels=in_c,
+                                   out_channels=layer,
+                                   kernel_size=3,
+                                   dilation=dilation,
+                                   stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
             in_c = layer
-        modules += [nn.Conv2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=1)]
+        modules += [nn.ConvTranspose2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=2)]
 
         # ========================
         self.cnn = nn.Sequential(*modules)
@@ -177,7 +130,7 @@ class VAE(nn.Module):
         #  2. Apply the reparametrization trick to obtain z.
         # ====== YOUR CODE: ======
         h = self.features_encoder(x).reshape(x.shape[0], -1)
-        sample = torch.randn((h.shape[0], self.z_dim))
+        sample = torch.randn((h.shape[0], self.z_dim)).to(device=h.device)
         mu = self.mu_layer(h)
         log_sigma2 = self.sigma_layer(h)
         z = mu + sample * log_sigma2
@@ -212,7 +165,6 @@ class VAE(nn.Module):
             #    Instead of sampling from N(psi(z), sigma2 I), we'll just take
             #    the mean, i.e. psi(z).
             # ====== YOUR CODE: ======
-            # todo: from where should i get the mean!?
             z = torch.randn((n, self.z_dim), device=device)
             samples = self.decode(z)
             # ========================
@@ -247,15 +199,18 @@ def vae_loss(x, xr, z_mu, z_log_sigma2, x_sigma2):
     #  1. The covariance matrix of the posterior is diagonal.
     #  2. You need to average over the batch dimension.
     # ====== YOUR CODE: ======
-    # TODO: RECONSIDER IMPL, MINE DOESNT WORK SARI DOES
-    dx = torch.prod(torch.tensor(x.shape[1:]))
+    dx = prod(x.shape[1:])
     dz = z_mu.shape[1]
+    reshaped_dist = (x - xr).reshape(x.shape[0], -1)
+    data_loss = ((torch.norm(reshaped_dist, p=2, dim=-1)) ** 2 / (dx * x_sigma2))
+    log_det_var = torch.sum(z_log_sigma2, dim=-1)
+    trace_var = torch.sum(torch.exp(z_log_sigma2), dim=-1)
+    kldiv_loss = torch.norm(z_mu, 2, -1) ** 2 + trace_var - dz - log_det_var
 
-    data_loss = (((x - xr).reshape(x.shape[0], -1).norm(dim=-1) ** 2) / (x_sigma2 * dx)).mean()
-    var_mat = torch.exp(z_log_sigma2)
-    print(var_mat.shape)
-    kldiv_loss = torch.exp(z_log_sigma2).sum(dim=-1) - z_log_sigma2.sum(dim=-1) + z_mu.norm(dim=-1) ** 2 - dz
-    loss = data_loss + kldiv_loss.mean()
+    data_loss = data_loss.mean()
+    kldiv_loss = kldiv_loss.mean()
+
+    loss = (data_loss + kldiv_loss)
     # ========================
 
     return loss, data_loss, kldiv_loss

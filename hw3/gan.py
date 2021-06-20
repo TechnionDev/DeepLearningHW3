@@ -5,6 +5,7 @@ from torch import Tensor
 from typing import Callable
 from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
+from math import prod
 
 
 class Discriminator(nn.Module):
@@ -20,7 +21,26 @@ class Discriminator(nn.Module):
         #  You can then use either an affine layer or another conv layer to
         #  flatten the features.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        modules = []
+
+        layers = [64, 128, 256, 512]
+        in_c = in_size[0]
+        for i, layer in enumerate(layers):
+            if i > 0 and i % 2 == 1:
+                dilation = 2
+                stride = 2
+            else:
+                dilation = 1
+                stride = 1
+            modules += [
+                nn.Conv2d(in_channels=in_c, out_channels=layer, kernel_size=3, dilation=dilation, stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
+            in_c = layer
+        self.cnn = nn.Sequential(*modules)
+        shape = self.cnn(torch.zeros(in_size).unsqueeze(0))
+        shape = prod(shape.shape[1:])
+        self.output_layer = nn.Linear(in_features=shape, out_features=1)
         # ========================
 
     def forward(self, x):
@@ -33,7 +53,8 @@ class Discriminator(nn.Module):
         #  No need to apply sigmoid to obtain probability - we'll combine it
         #  with the loss due to improved numerical stability.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        y = self.cnn(x).reshape(x.shape[0], -1)
+        y = self.output_layer(y)
         # ========================
         return y
 
@@ -48,13 +69,35 @@ class Generator(nn.Module):
         """
         super().__init__()
         self.z_dim = z_dim
-
         # TODO: Create the generator model layers.
         #  To combine image features you can use the DecoderCNN from the VAE
         #  section or implement something new.
         #  You can assume a fixed image size.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        modules = []
+        self.featuremap_size = featuremap_size
+        layers = list(reversed([64, 128, 256, 512]))
+        in_c = int(z_dim/(featuremap_size**2))
+        print(f"in_c is {in_c}")
+        for i, layer in enumerate(layers):
+            if i % 2 == 0:
+                dilation = 3
+                stride = 3
+            else:
+                dilation = 1
+                stride = 1
+            modules += [
+                nn.ConvTranspose2d(in_channels=in_c,
+                                   out_channels=layer,
+                                   kernel_size=3,
+                                   dilation=dilation,
+                                   stride=stride),
+                nn.BatchNorm2d(layer),
+                nn.ELU()]
+            in_c = layer
+        modules += [nn.ConvTranspose2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=5)]
+        self.cnn = nn.Sequential(*modules)
+
         # ========================
 
     def sample(self, n, with_grad=False):
@@ -71,7 +114,12 @@ class Generator(nn.Module):
         #  Generate n latent space samples and return their reconstructions.
         #  Don't use a loop.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        sample = torch.randn(n, self.z_dim)
+        if with_grad:
+            samples = self.forward(sample)
+        else:
+            with torch.no_grad:
+                samples = self.forward(sample)
         # ========================
         return samples
 
@@ -85,7 +133,9 @@ class Generator(nn.Module):
         #  Don't forget to make sure the output instances have the same
         #  dynamic range as the original (real) images.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        z = z.reshape(z.shape[0], -1, self.featuremap_size, self.featuremap_size)
+        print(f"shape of z is {z.shape}")
+        x = self.cnn(z)
         # ========================
         return x
 
@@ -138,13 +188,13 @@ def generator_loss_fn(y_generated, data_label=0):
 
 
 def train_batch(
-    dsc_model: Discriminator,
-    gen_model: Generator,
-    dsc_loss_fn: Callable,
-    gen_loss_fn: Callable,
-    dsc_optimizer: Optimizer,
-    gen_optimizer: Optimizer,
-    x_data: Tensor,
+        dsc_model: Discriminator,
+        gen_model: Generator,
+        dsc_loss_fn: Callable,
+        gen_loss_fn: Callable,
+        dsc_optimizer: Optimizer,
+        gen_optimizer: Optimizer,
+        x_data: Tensor,
 ):
     """
     Trains a GAN for over one batch, updating both the discriminator and
