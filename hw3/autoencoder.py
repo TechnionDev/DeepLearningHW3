@@ -20,7 +20,7 @@ class EncoderCNN(nn.Module):
         #  use pooling or only strides, use any activation functions,
         #  use BN or Dropout, etc.
         # ====== YOUR CODE: ======
-        layers = [64, 128, 256, 512]
+        layers = [64, 128, 256]
         in_c = in_channels
         for i, layer in enumerate(layers):
             if i > 0 and i % 2 == 1:
@@ -58,10 +58,10 @@ class DecoderCNN(nn.Module):
         #  output should be a batch of images, with same dimensions as the
         #  inputs to the Encoder were.
         # ====== YOUR CODE: ======
-        layers = list(reversed([64, 128, 256, 512]))
+        layers = list(reversed([64, 128, 256]))
         in_c = in_channels
         for i, layer in enumerate(layers):
-            if i % 2 == 0:
+            if i % 2 == 1:
                 dilation = 2
                 stride = 2
             else:

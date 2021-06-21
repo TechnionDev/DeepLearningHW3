@@ -134,7 +134,6 @@ class Generator(nn.Module):
         #  dynamic range as the original (real) images.
         # ====== YOUR CODE: ======
         z = z.reshape(z.shape[0], -1, self.featuremap_size, self.featuremap_size)
-        print(f"shape of z is {z.shape}")
         x = self.cnn(z)
         # ========================
         return x
