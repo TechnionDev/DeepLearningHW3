@@ -21,15 +21,15 @@ class EncoderCNN(nn.Module):
         #  use BN or Dropout, etc.
         # ====== YOUR CODE: ======
         modules += [
-            nn.Conv2d(in_channels = in_channels,out_channels=128,kernel_size=5,padding=1,dilation=1),
+            nn.Conv2d(in_channels=in_channels, out_channels=128, kernel_size=5, padding=1, dilation=1),
             nn.BatchNorm2d(num_features=128),
             nn.Dropout2d(p=0.4),
             nn.ELU(),
-            nn.Conv2d(in_channels = 128,out_channels=512,kernel_size=5,padding=1,dilation=2,stride=2),
+            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=5, padding=1, dilation=2, stride=2),
             nn.BatchNorm2d(num_features=512),
             nn.Dropout2d(p=0.4),
             nn.ELU(),
-            nn.Conv2d(in_channels = 512,out_channels=out_channels,kernel_size=5,padding=3,dilation=2),
+            nn.Conv2d(in_channels=512, out_channels=out_channels, kernel_size=5, padding=3, dilation=2),
             nn.Sigmoid()
         ]
         # ========================
@@ -55,18 +55,19 @@ class DecoderCNN(nn.Module):
         #  inputs to the Encoder were.
         # ====== YOUR CODE: ======
         modules += [
-            nn.ConvTranspose2d(in_channels = in_channels,out_channels=512,kernel_size=5,padding=1,dilation=2,stride=2),
+            nn.ConvTranspose2d(in_channels=in_channels, out_channels=512, kernel_size=5, padding=1, dilation=2,
+                               stride=2),
             nn.Dropout2d(p=0.1),
             nn.ELU(),
-#             nn.BatchNorm2d(num_features=512),
-            nn.ConvTranspose2d(in_channels = 512,out_channels=128,kernel_size=5,padding=0,dilation=1),
+            #             nn.BatchNorm2d(num_features=512),
+            nn.ConvTranspose2d(in_channels=512, out_channels=128, kernel_size=5, padding=0, dilation=1),
             nn.Dropout2d(p=0.1),
             nn.ELU(),
-#             nn.BatchNorm2d(num_features=128),
-            nn.ConvTranspose2d(in_channels = 128,out_channels=out_channels,kernel_size=4,padding=0,dilation=1),
-#             nn.ELU(),
-#             nn.Dropout2d(p=0.2),
-#             nn.BatchNorm2d(num_features=out_channels)
+            #             nn.BatchNorm2d(num_features=128),
+            nn.ConvTranspose2d(in_channels=128, out_channels=out_channels, kernel_size=4, padding=0, dilation=1),
+            #             nn.ELU(),
+            #             nn.Dropout2d(p=0.2),
+            #             nn.BatchNorm2d(num_features=out_channels)
         ]
         # ========================
         self.cnn = nn.Sequential(*modules)
@@ -203,5 +204,3 @@ def vae_loss(x, xr, z_mu, z_log_sigma2, x_sigma2):
     # ========================
 
     return loss, data_loss, kldiv_loss
-
-
