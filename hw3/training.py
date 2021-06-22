@@ -319,6 +319,7 @@ class VAETrainer(Trainer):
         loss,data_loss,kl_div_loss = self.loss_fn(x,xr,mu,log_sigma2)
         loss.backward()
         self.optimizer.step()
+
         # ========================
 
         return BatchResult(loss.item(), 1 / data_loss.item())

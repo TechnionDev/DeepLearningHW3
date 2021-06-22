@@ -20,22 +20,18 @@ class EncoderCNN(nn.Module):
         #  use pooling or only strides, use any activation functions,
         #  use BN or Dropout, etc.
         # ====== YOUR CODE: ======
-        layers = [64, 128, 256]
-        in_c = in_channels
-        for i, layer in enumerate(layers):
-            if i > 0 and i % 2 == 1:
-                dilation = 2
-                stride = 2
-            else:
-                dilation = 1
-                stride = 1
-            modules += [
-                nn.Conv2d(in_channels=in_c, out_channels=layer, kernel_size=3, dilation=dilation, stride=stride),
-                nn.BatchNorm2d(layer),
-                nn.ELU()]
-            in_c = layer
-        modules += [nn.Conv2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=1)]
-
+        modules += [
+            nn.Conv2d(in_channels = in_channels,out_channels=128,kernel_size=5,padding=1,dilation=1),
+            nn.BatchNorm2d(num_features=128),
+            nn.Dropout2d(p=0.4),
+            nn.ELU(),
+            nn.Conv2d(in_channels = 128,out_channels=512,kernel_size=5,padding=1,dilation=2,stride=2),
+            nn.BatchNorm2d(num_features=512),
+            nn.Dropout2d(p=0.4),
+            nn.ELU(),
+            nn.Conv2d(in_channels = 512,out_channels=out_channels,kernel_size=5,padding=3,dilation=2),
+            nn.Sigmoid()
+        ]
         # ========================
         self.cnn = nn.Sequential(*modules)
 
@@ -58,26 +54,20 @@ class DecoderCNN(nn.Module):
         #  output should be a batch of images, with same dimensions as the
         #  inputs to the Encoder were.
         # ====== YOUR CODE: ======
-        layers = list(reversed([64, 128, 256]))
-        in_c = in_channels
-        for i, layer in enumerate(layers):
-            if i % 2 == 1:
-                dilation = 2
-                stride = 2
-            else:
-                dilation = 1
-                stride = 1
-            modules += [
-                nn.ConvTranspose2d(in_channels=in_c,
-                                   out_channels=layer,
-                                   kernel_size=3,
-                                   dilation=dilation,
-                                   stride=stride),
-                nn.BatchNorm2d(layer),
-                nn.ELU()]
-            in_c = layer
-        modules += [nn.ConvTranspose2d(in_channels=layers[-1], out_channels=out_channels, kernel_size=2)]
-
+        modules += [
+            nn.ConvTranspose2d(in_channels = in_channels,out_channels=512,kernel_size=5,padding=1,dilation=2,stride=2),
+            nn.Dropout2d(p=0.1),
+            nn.ELU(),
+#             nn.BatchNorm2d(num_features=512),
+            nn.ConvTranspose2d(in_channels = 512,out_channels=128,kernel_size=5,padding=0,dilation=1),
+            nn.Dropout2d(p=0.1),
+            nn.ELU(),
+#             nn.BatchNorm2d(num_features=128),
+            nn.ConvTranspose2d(in_channels = 128,out_channels=out_channels,kernel_size=4,padding=0,dilation=1),
+#             nn.ELU(),
+#             nn.Dropout2d(p=0.2),
+#             nn.BatchNorm2d(num_features=out_channels)
+        ]
         # ========================
         self.cnn = nn.Sequential(*modules)
 
@@ -209,8 +199,9 @@ def vae_loss(x, xr, z_mu, z_log_sigma2, x_sigma2):
 
     data_loss = data_loss.mean()
     kldiv_loss = kldiv_loss.mean()
-
     loss = (data_loss + kldiv_loss)
     # ========================
 
     return loss, data_loss, kldiv_loss
+
+
