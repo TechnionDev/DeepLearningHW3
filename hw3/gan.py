@@ -21,23 +21,46 @@ class Discriminator(nn.Module):
         #  You can then use either an affine layer or another conv layer to
         #  flatten the features.
         # ====== YOUR CODE: ======
+        self.in_size = in_size
+        # Size of z latent vector (i.e. size of generator input)
+        nz = in_size[0]
+        # Size of feature maps in generator
+        # Size of feature maps in discriminator
+        ndf = 64
         modules = []
         modules += [
-            nn.Conv2d(in_channels=in_size[0], out_channels=128, kernel_size=5, padding=1, dilation=1),
-            nn.BatchNorm2d(num_features=128),
-            nn.Dropout2d(p=0.4),
-            nn.ELU(),
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=5, padding=1, dilation=2, stride=2),
-            nn.BatchNorm2d(num_features=256),
-            nn.Dropout2d(p=0.4),
-            nn.ELU(),
-            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=5, padding=3, dilation=2),
-            nn.Sigmoid()
+            nn.Conv2d(in_size[0], 32, kernel_size=5),
+            # nn.Dropout2d(p=0.1),
+            nn.ReLU(),
+
+            nn.Conv2d(32, 128, kernel_size=5, padding=2, stride=2),
+            nn.BatchNorm2d(128),
+            # nn.Dropout2d(p=0.1),
+            nn.LeakyReLU(0.1),
+
+            nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2),
+            nn.BatchNorm2d(256),
+            nn.Dropout2d(p=0.),
+            nn.Tanh(),
+            nn.Conv2d(256, 256, kernel_size=5, padding=6, stride=2),
+            nn.BatchNorm2d(256),
+            # nn.Dropout2d(p=0.1),
+            nn.Tanh(),
+
+            nn.Conv2d(256, 256, kernel_size=5, padding=2, stride=2),
+            nn.BatchNorm2d(256),
+            # nn.Dropout2d(p=0.1),
+            nn.LeakyReLU(0.1),
+            nn.Conv2d(256, 256, kernel_size=5, padding=7, stride=2),
+            nn.BatchNorm2d(256),
+            # nn.Dropout2d(p=0.1),
+            nn.LeakyReLU(0.1),
+            nn.Conv2d(256, 1, kernel_size=8),
+            # nn.Dropout2d(p=0.1),
+            nn.LeakyReLU(0.1),
         ]
         self.cnn = nn.Sequential(*modules)
-        shape = self.cnn(torch.zeros(in_size).unsqueeze(0))
-        shape = prod(shape.shape[1:])
-        self.output_layer = nn.Linear(in_features=shape, out_features=1)
+
         # ========================
 
     def forward(self, x):
@@ -50,8 +73,7 @@ class Discriminator(nn.Module):
         #  No need to apply sigmoid to obtain probability - we'll combine it
         #  with the loss due to improved numerical stability.
         # ====== YOUR CODE: ======
-        y = self.cnn(x).reshape(x.shape[0], -1)
-        y = self.output_layer(y)
+        y = self.cnn(x).reshape((x.shape[0], 1))
         # ========================
         return y
 
@@ -74,26 +96,101 @@ class Generator(nn.Module):
         modules = []
         self.featuremap_size = featuremap_size
         in_c = int(z_dim / (featuremap_size ** 2))
-        modules += [
-            nn.ConvTranspose2d(in_channels=in_c, out_channels=512, kernel_size=5, padding=1, dilation=2,
-                               stride=2),
-            nn.Dropout2d(p=0.5),
-            nn.ELU(),
-            #             nn.BatchNorm2d(num_features=512),
-            nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=5, padding=0, dilation=3,
-                               stride=3, output_padding=2),
-            nn.Dropout2d(p=0.5),
-            nn.ELU(),
-            #             nn.BatchNorm2d(num_features=128),
-            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=5, padding=0, dilation=2,
-                               stride=1, output_padding=1),
-            nn.Dropout2d(p=0.5),
-            nn.ELU()
-            #             nn.ELU(),
-            #             nn.Dropout2d(p=0.2),
-            #             nn.BatchNorm2d(num_features=out_channels)
+        # Number of channels in the training images. For color images this is 3
+        nc = out_channels
+        # Size of z latent vector (i.e. size of generator input)
+        nz = z_dim
+        # Size of feature maps in generator
+        ngf = 64
+
+        # Size of feature maps in discriminator
+        ndf = 64
+        modules = [
+            nn.Upsample(scale_factor=2, mode="bicubic"),
+
+            nn.Conv2d(in_c, ngf * 2, kernel_size=5, padding=2),
+            nn.Dropout2d(0.2),
+            nn.BatchNorm2d(ngf * 2),
+            nn.LeakyReLU(0.1),
+
+            nn.Conv2d(ngf * 2, ngf * 2, kernel_size=5, padding=2),
+            nn.BatchNorm2d(ngf * 2),
+            nn.LeakyReLU(0.1),
+
+            nn.Upsample(scale_factor=2, mode="bicubic"),
+
+            nn.Conv2d(ngf * 2, ngf, kernel_size=5, padding=2, dilation=1, stride=1),
+            nn.Dropout2d(0.2),
+            nn.BatchNorm2d(ngf),
+            nn.LeakyReLU(0.1),
+
+            nn.Conv2d(ngf, ngf, kernel_size=5, padding=2, dilation=1, stride=1),
+            nn.Dropout2d(0.2),
+            nn.BatchNorm2d(ngf),
+            nn.LeakyReLU(0.1),
+
+            nn.Upsample(scale_factor=2, mode="bicubic"),
+
+            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.LeakyReLU(0.1),
+            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.LeakyReLU(0.1),
+
+            nn.Upsample(scale_factor=2, mode="bicubic"),
+            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.LeakyReLU(0.1),
+            nn.Conv2d(ngf, nc, kernel_size=5, padding=2, dilation=1),
+            nn.Tanh()
+
         ]
-        modules += [nn.ConvTranspose2d(in_channels=128, out_channels=out_channels, kernel_size=5)]
+        #         modules =[
+        #             nn.ConvTranspose2d( in_c, ngf * 2, 4, 2, 0, bias=False),
+        #             nn.BatchNorm2d(ngf * 2),
+        #             nn.LeakyReLU(negative_slope=0.2),
+
+        #             # state size. (ngf*4) x 8 x 8
+        #             nn.ConvTranspose2d( ngf*2 , ngf, 4, 2, 1, bias=False),
+        #             nn.BatchNorm2d(ngf),
+        #             nn.LeakyReLU(negative_slope=0.2),
+
+        #             # state size. (ngf*2) x 16 x 16
+        #             nn.ConvTranspose2d( ngf, ngf, 6, 2, 1, bias=False),
+        #             nn.BatchNorm2d(ngf),
+        #             nn.LeakyReLU(negative_slope=0.2),
+
+        #             # state size. (ngf) x 32 x 32
+        #             nn.ConvTranspose2d( ngf, ngf, 5, 3, 1, bias=False),
+        #             nn.BatchNorm2d(ngf),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.Conv2d(ngf,int(ngf/2),kernel_size=5,stride=2,padding=2),
+        #             nn.BatchNorm2d(int(ngf/2)),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.Conv2d(int(ngf/2),nc,kernel_size=2,stride=1,padding=1),
+        #             nn.Tanh()
+
+        #         ]
+        #         modules += [
+        #             nn.ConvTranspose2d(in_channels=in_c, out_channels=256, kernel_size=5, padding=1, dilation=1,
+        #                                stride=2),
+        # #             nn.Dropout2d(p=0.3),
+        #             nn.BatchNorm2d(num_features=256),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=5, padding=0, dilation=1,
+        #                                stride=3),
+        # #             nn.Dropout2d(p=0.3),
+        #             nn.BatchNorm2d(num_features=128),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=5, padding=0, dilation=1,
+        #                                stride=2),
+        # #             nn.Dropout2d(p=0.3),
+        #             nn.BatchNorm2d(num_features=128),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=3,stride=2),
+        #             nn.BatchNorm2d(num_features=64),
+        #             nn.LeakyReLU(negative_slope=0.2),
+        #             nn.Conv2d(in_channels=64, out_channels=out_channels, kernel_size=1, padding=2,stride=2, dilation=1),
+        #             nn.Tanh()
+        #         ]
         self.cnn = nn.Sequential(*modules)
 
         # ========================
@@ -112,7 +209,8 @@ class Generator(nn.Module):
         #  Generate n latent space samples and return their reconstructions.
         #  Don't use a loop.
         # ====== YOUR CODE: ======
-        sample = torch.randn(n, self.z_dim)
+        sample = torch.randn(n, self.z_dim).to(device=device) * 10
+
         if not with_grad:
             with torch.no_grad():
                 samples = self.forward(sample)
@@ -229,13 +327,15 @@ def train_batch(
     #  2. Calculate generator loss
     #  3. Update generator parameters
     # ====== YOUR CODE: ======
-    sample = gen_model.sample(x_data.shape[0], with_grad=True)
-    dsc_gen_out = dsc_model(sample)
-    dsc_optimizer.zero_grad()
-    gen_optimizer.zero_grad()
-    gen_loss = gen_loss_fn(dsc_gen_out)
-    gen_loss.backward()
-    gen_optimizer.step()
+    k = 1
+    for i in range(k):
+        sample = gen_model.sample(x_data.shape[0], with_grad=True)
+        dsc_gen_out = dsc_model(sample)
+        dsc_optimizer.zero_grad()
+        gen_optimizer.zero_grad()
+        gen_loss = gen_loss_fn(dsc_gen_out)
+        gen_loss.backward()
+        gen_optimizer.step()
     # ========================
 
     return dsc_loss.item(), gen_loss.item()
@@ -258,9 +358,10 @@ def save_checkpoint(gen_model, dsc_losses, gen_losses, checkpoint_file):
     #  You should decide what logic to use for deciding when to save.
     #  If you save, set saved to True.
     # ====== YOUR CODE: ======
-    if len(gen_losses)%3 == 0:
-        torch.save(gen_model,checkpoint_file)
-    saved = True
+    if len(gen_losses) % 4 == 0:
+        torch.save(gen_model, checkpoint_file)
+        saved = True
     # ========================
 
     return saved
+

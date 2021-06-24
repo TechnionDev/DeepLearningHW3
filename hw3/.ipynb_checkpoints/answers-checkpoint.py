@@ -184,20 +184,18 @@ PART3_CUSTOM_DATA_URL = None
 
 def part3_gan_hyperparams():
     hypers = dict(
-        batch_size=128,
-        z_dim=64,
+        batch_size=64,
+        z_dim=256,
         data_label=1,
         label_noise=0.1,
         discriminator_optimizer=dict(
-            type="SGD",  # Any name in nn.optim like SGD, Adam
-            lr=0.0003,
-#             betas = (0.5,0.999),
+            type="Adam",  # Any name in nn.optim like SGD, Adam
+            lr=0.001,
             # You an add extra args for the optimizer here
         ),
         generator_optimizer=dict(
             type="Adam",  # Any name in nn.optim like SGD, Adam
-            lr=0.002,
-            betas = (0.5,0.999),
+            lr=0.01,
             # You an add extra args for the optimizer here
         ),
     )
@@ -247,7 +245,5 @@ An equation: $e^{i\pi} -1 = 0$
 """
 
 # ==============
-
-
 
 
