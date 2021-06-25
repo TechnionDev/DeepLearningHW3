@@ -6,6 +6,7 @@ from torch import Tensor
 from typing import Iterator
 import unittest
 
+
 def char_maps(text: str):
     """
     Create mapping from the unique chars in a text to integers and
@@ -90,7 +91,7 @@ def onehot_to_chars(embedded_text: Tensor, idx_to_char: dict) -> str:
     # TODO: Implement the reverse-embedding.
     # ====== YOUR CODE: ======
     indexes = torch.FloatTensor(range(len(idx_to_char))).to(device=embedded_text.device)
-    embedded_text=embedded_text.clone().float()
+    embedded_text = embedded_text.clone().float()
     chars_in_indexes = (indexes @ embedded_text.T).tolist()
     result = "".join([idx_to_char[int(i)] for i in chars_in_indexes])
     # ========================
@@ -151,6 +152,7 @@ def hot_softmax(y, dim=0, temperature=1.0):
     # ========================
     return result
 
+
 def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     """
     Generates a sequence of chars based on a given model and a start sequence.
@@ -187,7 +189,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     state = None
     with torch.no_grad():
         for _ in range(n_chars):
-            out, state = model(model_in,state)
+            out, state = model(model_in, state)
             vec = hot_softmax(out[0, -1], dim=-1, temperature=T)
             sample = torch.multinomial(vec, 1)
             model_in = idx_to_char[sample.item()]
@@ -196,6 +198,7 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
 
     # ========================
     return out_text
+
 
 class SequenceBatchSampler(torch.utils.data.Sampler):
     """
@@ -219,12 +222,13 @@ class SequenceBatchSampler(torch.utils.data.Sampler):
         num_batches = len(self.dataset) // self.batch_size
         for j in range(num_batches):
             for i in range(self.batch_size):
-                yield j+i*num_batches
+                yield j + i * num_batches
 
     def __len__(self):
         return len(self.dataset)
 
 
+# TODO: solve this fucking issue where cpu is fine and GPU is fucked
 class MultilayerGRU(nn.Module):
     """
     Represents a multi-layer GRU (gated recurrent unit) model.
@@ -264,12 +268,7 @@ class MultilayerGRU(nn.Module):
         #      then call self.register_parameter() on them. Also make
         #      sure to initialize them. See functions in torch.nn.init.
         # ====== YOUR CODE: ======
-        print(f"in_dim is {in_dim}")
-        print(f"h_dim is {h_dim}")
-        print(f"out_dim is {out_dim}")
-        self.sigmoid = torch.nn.Sigmoid()
-        self.tanh = torch.nn.Tanh()
-        self.dropout = torch.nn.Dropout(p=dropout)
+        self.dropout = dropout
 
         for i in range(n_layers):
             self.layer_params += [{}]
@@ -335,11 +334,11 @@ class MultilayerGRU(nn.Module):
             x = input[:, j]
             for i, layer in enumerate(self.layer_params):
                 if i != 0:
-                    x = self.dropout(x)
-                update_gate_out = self.sigmoid(layer['z_in'](x)+layer['z_hidden'](layer_states[i]))
-                reset_gate_out = self.sigmoid(layer['r_in'](x)+layer['r_hidden'](layer_states[i]))
+                    x = torch.dropout(x, self.dropout, self.training)
+                update_gate_out = torch.sigmoid(layer['z_in'](x) + layer['z_hidden'](layer_states[i]))
+                reset_gate_out = torch.sigmoid(layer['r_in'](x) + layer['r_hidden'](layer_states[i]))
                 h_dot_r = layer_states[i] * reset_gate_out
-                candidate_hidden_out = self.tanh(layer['g_in'](x)+layer['g_hidden'](h_dot_r))
+                candidate_hidden_out = torch.tanh(layer['g_in'](x) + layer['g_hidden'](h_dot_r))
                 layer_states[i] = update_gate_out * layer_states[i] + (1 - update_gate_out) * candidate_hidden_out
                 x = layer_states[i]
             layer_output[:, j, :] = self.output_layer(x)
