@@ -63,7 +63,7 @@ class Trainer(abc.ABC):
         actual_num_epochs = 0
         train_loss, train_acc, test_loss, test_acc = [], [], [], []
         print(f"device is {self.device}")
-        best_acc = None
+        best_loss = None
         epochs_without_improvement = 0
 
         checkpoint_filename = None
@@ -101,8 +101,8 @@ class Trainer(abc.ABC):
             test_loss += test_result.losses
             test_acc += [test_result.accuracy]
 
-            if best_acc is None or best_acc < test_result.accuracy:
-                best_acc = test_result.accuracy
+            if best_loss is None or best_loss < test_result.losses.mean():
+                best_loss = test_result.losses.mean()
                 epochs_without_improvement = 0
                 save_checkpoint = True
             else:
