@@ -227,8 +227,6 @@ class SequenceBatchSampler(torch.utils.data.Sampler):
     def __len__(self):
         return len(self.dataset)
 
-
-# TODO: solve this fucking issue where cpu is fine and GPU is fucked
 class MultilayerGRU(nn.Module):
     """
     Represents a multi-layer GRU (gated recurrent unit) model.
@@ -277,12 +275,12 @@ class MultilayerGRU(nn.Module):
             else:
                 input_dim = h_dim
 
-            self.layer_params[i]['z_in'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.layer_params[i]['z_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
-            self.layer_params[i]['r_in'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.layer_params[i]['r_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
-            self.layer_params[i]['g_in'] = nn.Linear(input_dim, h_dim, bias=True)
-            self.layer_params[i]['g_hidden'] = nn.Linear(h_dim, h_dim, bias=False)
+            self.layer_params[i]['z_in'] = nn.Linear(input_dim, h_dim, bias=False)
+            self.layer_params[i]['z_hidden'] = nn.Linear(h_dim, h_dim, bias=True)
+            self.layer_params[i]['r_in'] = nn.Linear(input_dim, h_dim, bias=False)
+            self.layer_params[i]['r_hidden'] = nn.Linear(h_dim, h_dim, bias=True)
+            self.layer_params[i]['g_in'] = nn.Linear(input_dim, h_dim, bias=False)
+            self.layer_params[i]['g_hidden'] = nn.Linear(h_dim, h_dim, bias=True)
             self.add_module(f'z_input{i}', self.layer_params[i]['z_in'])
             self.add_module(f'z_hidden{i}', self.layer_params[i]['z_hidden'])
             self.add_module(f'r_input{i}', self.layer_params[i]['r_in'])
@@ -318,7 +316,6 @@ class MultilayerGRU(nn.Module):
                 )
             else:
                 layer_states.append(hidden_state[:, i, :])
-                # print(f"shape of hidden_state is {hidden_state.shape}")
         layer_input = input
         layer_output = None
 
@@ -345,4 +342,7 @@ class MultilayerGRU(nn.Module):
         layer_states = torch.cat(layer_states)
         hidden_state = layer_states.reshape((input.shape[0], len(self.layer_params), self.h_dim))
         # ========================
+
         return layer_output, hidden_state
+
+

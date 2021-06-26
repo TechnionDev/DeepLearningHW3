@@ -79,44 +79,41 @@ class Generator(nn.Module):
         self.featuremap_size = featuremap_size
 
         in_c = int(z_dim / (featuremap_size ** 2))
-        nc = out_channels
-        ngf = 64
-
         modules = [
             nn.Upsample(scale_factor=2, mode="bicubic"),
 
-            nn.Conv2d(in_c, ngf * 2, kernel_size=5, padding=2),
+            nn.Conv2d(in_c, 128, kernel_size=5, padding=2),
             nn.Dropout2d(0.2),
-            nn.BatchNorm2d(ngf * 2),
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.1),
 
-            nn.Conv2d(ngf * 2, ngf * 2, kernel_size=5, padding=2),
-            nn.BatchNorm2d(ngf * 2),
+            nn.Conv2d(128, 128, kernel_size=5, padding=2),
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.1),
 
             nn.Upsample(scale_factor=2, mode="bicubic"),
 
-            nn.Conv2d(ngf * 2, ngf, kernel_size=5, padding=2, dilation=1, stride=1),
+            nn.Conv2d(128, 64, kernel_size=5, padding=2, dilation=1, stride=1),
             nn.Dropout2d(0.2),
-            nn.BatchNorm2d(ngf),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.1),
 
-            nn.Conv2d(ngf, ngf, kernel_size=5, padding=2, dilation=1, stride=1),
+            nn.Conv2d(64, 64, kernel_size=5, padding=2, dilation=1, stride=1),
             nn.Dropout2d(0.2),
-            nn.BatchNorm2d(ngf),
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.1),
 
             nn.Upsample(scale_factor=2, mode="bicubic"),
 
-            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1, dilation=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1, dilation=1),
             nn.LeakyReLU(0.1),
 
             nn.Upsample(scale_factor=2, mode="bicubic"),
-            nn.Conv2d(ngf, ngf, kernel_size=3, padding=1, dilation=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1, dilation=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(ngf, nc, kernel_size=5, padding=2, dilation=1),
+            nn.Conv2d(64, out_channels, kernel_size=5, padding=2, dilation=1),
             nn.Tanh()
 
         ]
